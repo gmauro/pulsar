@@ -117,8 +117,15 @@ class DirectoryBaseManager(BaseManager):
 
     # Helpers methods related to setting up job script files.
     def _setup_job_file(self, job_id, command_line, dependencies_description=None, env=[], setup_params=None):
+        pre = command_line.split('docker')[0]
+        post = command_line.split('docker')[1]
+        pre_command_line = "{} docker{}".format(pre, post.split(' ')[0])
+        post_command_line = ' '.join(post.split(' ')[1:])
+        command_line_script = "#!/bin/bash \n\n {}".format(post_command_line)
+        self._write_job_script(job_id, command_line_script, script_name="sub_command.sh")
+        command_line_script_path = self._job_file(job_id, "sub_command.sh")
         command_line = self._expand_command_line(command_line, dependencies_description, job_directory=self.job_directory(job_id).job_directory)
-        script_env = self._job_template_env(job_id, command_line=command_line, env=env, setup_params=setup_params)
+        script_env = self._job_template_env(job_id, command_line="{} {}".format(pre_command_line, command_line_script_path), env=env, setup_params=setup_params)
         script = job_script(**script_env)
         return self._write_job_script(job_id, script)
 
@@ -144,8 +151,8 @@ class DirectoryBaseManager(BaseManager):
 
         return job_template_env
 
-    def _write_job_script(self, job_id, contents):
-        self._write_job_file(job_id, "command.sh", contents)
-        script_path = self._job_file(job_id, "command.sh")
+    def _write_job_script(self, job_id, contents, script_name="command.sh"):
+        self._write_job_file(job_id, script_name, contents)
+        script_path = self._job_file(job_id, script_name)
         os.chmod(script_path, stat.S_IEXEC | stat.S_IWRITE | stat.S_IREAD)
         return script_path
